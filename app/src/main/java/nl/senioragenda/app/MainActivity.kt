@@ -42,8 +42,9 @@ class MainActivity : ComponentActivity() {
         handleIncomingAlarmIntent(intent)
 
         setContent {
-            SeniorAgendaTheme {
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+            SeniorAgendaTheme(useLightTheme = state.useLightTheme) {
 
                 // Pas schermhelderheid voor het TFT LCD-paneel dynamisch aan op de nachtstand
                 LaunchedEffect(state.nightModeState.targetScreenBrightness) {
@@ -180,6 +181,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onTestReminderClick = viewModel::triggerTestReminder,
                     onToggleNightPreviewClick = viewModel::toggleManualNightPreview,
+                    onDisplayThemeModeSelected = viewModel::onDisplayThemeModeSelected,
                     onDismissSettingsSheet = viewModel::closeFamilySettings,
                 )
             }

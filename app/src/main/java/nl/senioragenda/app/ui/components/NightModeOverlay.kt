@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.senioragenda.app.domain.formatting.DutchDateTimeFormatter
-import nl.senioragenda.app.ui.theme.AgendaColors
+import nl.senioragenda.app.ui.theme.AgendaTheme
 import java.time.LocalDateTime
 
 /**
@@ -35,10 +35,12 @@ fun NightModeRestOverlay(
     isManualPreview: Boolean,
     onTapToWake: () -> Unit,
 ) {
+    val colors = AgendaTheme.colors
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AgendaColors.NightRestBackground)
+            .background(colors.nightRestBackground)
             .pointerInput(Unit) {
                 detectTapGestures { onTapToWake() }
             },
@@ -50,7 +52,7 @@ fun NightModeRestOverlay(
         ) {
             Text(
                 text = DutchDateTimeFormatter.formatTime(now.toLocalTime()),
-                color = AgendaColors.NightRestText,
+                color = colors.nightRestText,
                 fontSize = 84.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 2.sp,
@@ -62,7 +64,7 @@ fun NightModeRestOverlay(
                 } else {
                     "Nachtstand — tik op het scherm om even te kijken"
                 },
-                color = AgendaColors.NightRestHint,
+                color = colors.nightRestHint,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Medium,
             )
@@ -75,11 +77,13 @@ fun TemporaryWakeBanner(
     secondsRemaining: Long,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AgendaTheme.colors
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp),
-        color = AgendaColors.SurfaceCard,
+        color = colors.surfaceCard,
         shape = RoundedCornerShape(12.dp),
     ) {
         Box(
@@ -88,7 +92,7 @@ fun TemporaryWakeBanner(
         ) {
             Text(
                 text = "Nachtstand tijdelijk onderbroken — dimt over $secondsRemaining sec automatisch weer",
-                color = AgendaColors.AccentAmber,
+                color = colors.accentAmber,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
             )

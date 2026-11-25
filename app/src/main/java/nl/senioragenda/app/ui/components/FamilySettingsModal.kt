@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -29,7 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.senioragenda.app.ui.FamilySettingsState
-import nl.senioragenda.app.ui.theme.AgendaColors
+import nl.senioragenda.app.ui.theme.AgendaTheme
+import nl.senioragenda.app.ui.theme.DisplayThemeMode
 
 /**
  * Beheer- en testvenster voor familieleden (verborgen achter het kleine statuslabel in de kopbalk
@@ -39,6 +43,8 @@ import nl.senioragenda.app.ui.theme.AgendaColors
 fun FamilySettingsModal(
     state: FamilySettingsState,
     manualNightPreview: Boolean,
+    selectedThemeMode: DisplayThemeMode,
+    onThemeModeSelected: (DisplayThemeMode) -> Unit,
     onCalendarIdChanged: (String) -> Unit,
     onSaveCalendarId: () -> Unit,
     onSyncDeviceCalendarClick: () -> Unit,
@@ -47,23 +53,26 @@ fun FamilySettingsModal(
     onToggleNightPreviewClick: () -> Unit,
     onDismissClick: () -> Unit,
 ) {
+    val colors = AgendaTheme.colors
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AgendaColors.ReminderBackdrop),
+            .background(colors.reminderBackdrop),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
             modifier = Modifier
-                .padding(32.dp)
-                .widthIn(min = 620.dp, max = 820.dp),
-            color = AgendaColors.SurfacePanel,
+                .padding(28.dp)
+                .widthIn(min = 660.dp, max = 860.dp),
+            color = colors.surfacePanel,
             shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.5.dp, AgendaColors.BorderSubtle),
+            border = BorderStroke(1.5.dp, colors.borderSubtle),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(28.dp),
             ) {
                 Row(
@@ -73,33 +82,76 @@ fun FamilySettingsModal(
                 ) {
                     Text(
                         text = "Beheer & Google Agenda",
-                        color = AgendaColors.TextPrimary,
+                        color = colors.textPrimary,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.ExtraBold,
                     )
                     OutlinedButton(
                         onClick = onDismissClick,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, AgendaColors.BorderSubtle),
+                        border = BorderStroke(1.5.dp, colors.borderSubtle),
                     ) {
                         Text(
                             text = "Sluiten",
-                            color = AgendaColors.TextPrimary,
+                            color = colors.textPrimary,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Thema-keuze: Donker / Licht / Automatisch
+                Text(
+                    text = "Weergave (thema)",
+                    color = colors.textPrimary,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Automatisch gebruikt warm licht van 05:30 tot 19:00, rustig donker in de avond, en nachtstand van 23:30 tot 05:30.",
+                    color = colors.textSecondary,
+                    fontSize = 15.sp,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ThemeModeOptionButton(
+                        label = "Donker",
+                        selected = selectedThemeMode == DisplayThemeMode.DARK,
+                        onClick = { onThemeModeSelected(DisplayThemeMode.DARK) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeModeOptionButton(
+                        label = "Licht (warm)",
+                        selected = selectedThemeMode == DisplayThemeMode.LIGHT,
+                        onClick = { onThemeModeSelected(DisplayThemeMode.LIGHT) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeModeOptionButton(
+                        label = "Automatisch",
+                        selected = selectedThemeMode == DisplayThemeMode.AUTO,
+                        onClick = { onThemeModeSelected(DisplayThemeMode.AUTO) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = colors.borderSubtle)
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
                     text = "Koppel een gedeelde Google Agenda zodat familieleden op afstand afspraken kunnen beheren (ook via Gemini op hun eigen telefoon).",
-                    color = AgendaColors.TextSecondary,
-                    fontSize = 17.sp,
+                    color = colors.textSecondary,
+                    fontSize = 16.sp,
                 )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -114,19 +166,19 @@ fun FamilySettingsModal(
                         label = {
                             Text(
                                 text = "Google Agenda-ID (standaard: primary)",
-                                color = AgendaColors.TextSecondary,
+                                color = colors.textSecondary,
                             )
                         },
                         textStyle = androidx.compose.ui.text.TextStyle(
-                            color = AgendaColors.TextPrimary,
+                            color = colors.textPrimary,
                             fontSize = 18.sp,
                         ),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AgendaColors.AccentAmber,
-                            unfocusedBorderColor = AgendaColors.BorderSubtle,
-                            focusedContainerColor = AgendaColors.SurfaceCard,
-                            unfocusedContainerColor = AgendaColors.SurfaceCard,
+                            focusedBorderColor = colors.accentAmber,
+                            unfocusedBorderColor = colors.borderSubtle,
+                            focusedContainerColor = colors.surfaceCard,
+                            unfocusedContainerColor = colors.surfaceCard,
                         ),
                     )
 
@@ -134,8 +186,8 @@ fun FamilySettingsModal(
                         onClick = onSaveCalendarId,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AgendaColors.SurfaceCardHighlight,
-                            contentColor = AgendaColors.TextPrimary,
+                            containerColor = colors.surfaceCardHighlight,
+                            contentColor = colors.textPrimary,
                         ),
                         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
                     ) {
@@ -143,7 +195,7 @@ fun FamilySettingsModal(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -154,14 +206,14 @@ fun FamilySettingsModal(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AgendaColors.AccentGreen,
-                            contentColor = AgendaColors.AccentGreenOn,
+                            containerColor = colors.accentGreen,
+                            contentColor = colors.accentGreenOn,
                         ),
-                        contentPadding = PaddingValues(vertical = 16.dp),
+                        contentPadding = PaddingValues(vertical = 15.dp),
                     ) {
                         Text(
                             text = "Gebruik tablet Google Agenda",
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.ExtraBold,
                         )
                     }
@@ -171,20 +223,20 @@ fun FamilySettingsModal(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AgendaColors.AccentBlueButton,
-                            contentColor = AgendaColors.TextPrimary,
+                            containerColor = colors.accentBlueButton,
+                            contentColor = colors.onColoredButton,
                         ),
-                        contentPadding = PaddingValues(vertical = 16.dp),
+                        contentPadding = PaddingValues(vertical = 15.dp),
                     ) {
                         Text(
                             text = "Koppel via Google Cloud OAuth",
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -195,10 +247,10 @@ fun FamilySettingsModal(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AgendaColors.ReminderAccent,
-                            contentColor = AgendaColors.AccentAmberOn,
+                            containerColor = colors.reminderAccent,
+                            contentColor = colors.accentAmberOn,
                         ),
-                        contentPadding = PaddingValues(vertical = 15.dp),
+                        contentPadding = PaddingValues(vertical = 14.dp),
                     ) {
                         Text(
                             text = "Test herinnering (overlay + spraak)",
@@ -213,12 +265,12 @@ fun FamilySettingsModal(
                         onClick = onToggleNightPreviewClick,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.5.dp, AgendaColors.AccentSky),
-                        contentPadding = PaddingValues(vertical = 15.dp),
+                        border = BorderStroke(1.5.dp, colors.accentSky),
+                        contentPadding = PaddingValues(vertical = 14.dp),
                     ) {
                         Text(
                             text = if (manualNightPreview) "Stop nachtstand-voorbeeld" else "Test nachtstand (LCD)",
-                            color = AgendaColors.AccentSky,
+                            color = colors.accentSky,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                         )
@@ -229,12 +281,56 @@ fun FamilySettingsModal(
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         text = state.statusNotice,
-                        color = AgendaColors.AccentAmber,
+                        color = colors.accentAmber,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ThemeModeOptionButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = AgendaTheme.colors
+
+    if (selected) {
+        Button(
+            onClick = onClick,
+            modifier = modifier,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.accentAmber,
+                contentColor = colors.accentAmberOn,
+            ),
+            contentPadding = PaddingValues(vertical = 14.dp),
+        ) {
+            Text(
+                text = label,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.5.dp, colors.borderSubtle),
+            contentPadding = PaddingValues(vertical = 14.dp),
+        ) {
+            Text(
+                text = label,
+                color = colors.textPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
     }
 }

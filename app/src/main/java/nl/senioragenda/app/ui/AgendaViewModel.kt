@@ -32,6 +32,8 @@ import nl.senioragenda.app.speech.DutchSpeechManager
 import nl.senioragenda.app.speech.DutchVoiceInputManager
 import nl.senioragenda.app.speech.SpeechUiState
 import nl.senioragenda.app.speech.VoiceInputState
+import nl.senioragenda.app.ui.theme.DisplayThemeMode
+import nl.senioragenda.app.ui.theme.DisplayThemePolicy
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -74,6 +76,8 @@ data class AgendaUiState(
     val pendingConsentIntentSender: IntentSender? = null,
     val isGeminiConfigured: Boolean = false,
     val usingDeviceGoogleCalendar: Boolean = false,
+    val displayThemeMode: DisplayThemeMode = DisplayThemeMode.DARK,
+    val useLightTheme: Boolean = false,
 )
 
 class AgendaViewModel(
@@ -95,10 +99,16 @@ class AgendaViewModel(
     private var debouncedObserverRefreshJob: Job? = null
 
     private val _uiState = MutableStateFlow(
-        AgendaUiState(
-            isGeminiConfigured = container.geminiAppointmentParser.isGeminiConfigured,
-            settingsSheet = FamilySettingsState(calendarIdInput = container.preferences.calendarId),
-        ),
+        run {
+            val savedMode = container.preferences.displayThemeMode
+            val nowTime = LocalDateTime.now().toLocalTime()
+            AgendaUiState(
+                isGeminiConfigured = container.geminiAppointmentParser.isGeminiConfigured,
+                settingsSheet = FamilySettingsState(calendarIdInput = container.preferences.calendarId),
+                displayThemeMode = savedMode,
+                useLightTheme = DisplayThemePolicy.shouldUseLightTheme(savedMode, nowTime),
+            )
+        },
     )
     val uiState: StateFlow<AgendaUiState> = _uiState.asStateFlow()
 
@@ -214,10 +224,16 @@ class AgendaViewModel(
             now.truncatedTo(ChronoUnit.MINUTES)
         }
 
+        val useLight = DisplayThemePolicy.shouldUseLightTheme(
+            mode = _uiState.value.displayThemeMode,
+            time = now.toLocalTime(),
+        )
+
         _uiState.update { state ->
             if (state.now == displayNow &&
                 state.activeReminder == currentReminder &&
-                state.nightModeState == nightState
+                state.nightModeState == nightState &&
+                state.useLightTheme == useLight
             ) {
                 state
             } else {
@@ -225,6 +241,7 @@ class AgendaViewModel(
                     now = displayNow,
                     activeReminder = currentReminder,
                     nightModeState = nightState,
+                    useLightTheme = useLight,
                 )
             }
         }
@@ -459,6 +476,18 @@ class AgendaViewModel(
     private fun registerUserActivityIfTemporaryWake() {
         if (_uiState.value.nightModeState is NightModeState.TemporaryWake) {
             temporaryWakeUntil = LocalDateTime.now().plusSeconds(NightModePolicy.TEMPORARY_WAKE_SECONDS)
+        }
+    }
+
+    fun onDisplayThemeModeSelected(mode: DisplayThemeMode) {
+        container.preferences.displayThemeMode = mode
+        val now = LocalDateTime.now()
+        val useLight = DisplayThemePolicy.shouldUseLightTheme(mode, now.toLocalTime())
+        _uiState.update {
+            it.copy(
+                displayThemeMode = mode,
+                useLightTheme = useLight,
+            )
         }
     }
 

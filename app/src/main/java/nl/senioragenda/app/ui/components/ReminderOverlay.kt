@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.sp
 import nl.senioragenda.app.domain.formatting.DutchDateTimeFormatter
 import nl.senioragenda.app.domain.formatting.DutchSpeechScriptBuilder
 import nl.senioragenda.app.reminder.ActiveReminder
-import nl.senioragenda.app.ui.theme.AgendaColors
+import nl.senioragenda.app.ui.theme.AgendaTheme
 import java.time.LocalDateTime
 
 /**
@@ -58,11 +58,11 @@ fun ReminderOverlay(
     onReadAgainClick: () -> Unit,
     onUnderstoodClick: () -> Unit,
 ) {
-    // Blokkeer de systeem-terugknop zolang de herinnering zichtbaar is
     BackHandler(enabled = true) {
         // Bewust leeg: mag uitsluitend via "Begrepen" worden gesloten.
     }
 
+    val colors = AgendaTheme.colors
     val appointment = reminder.appointment
     val timeRange = DutchDateTimeFormatter.formatAppointmentTimeLabel(appointment)
     val countdownLabel = DutchSpeechScriptBuilder.formatCountdownBadge(appointment, now)
@@ -70,9 +70,8 @@ fun ReminderOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AgendaColors.ReminderBackdrop)
+            .background(colors.reminderBackdrop)
             .pointerInput(Unit) {
-                // Vang alle tikken op de achtergrond af zonder de overlay te sluiten
                 detectTapGestures { /* Bewust niet sluiten */ }
             },
         contentAlignment = Alignment.Center,
@@ -81,9 +80,9 @@ fun ReminderOverlay(
             modifier = Modifier
                 .padding(40.dp)
                 .widthIn(min = 640.dp, max = 920.dp),
-            color = AgendaColors.ReminderCardBg,
+            color = colors.reminderCardBg,
             shape = RoundedCornerShape(30.dp),
-            border = BorderStroke(4.dp, AgendaColors.ReminderAccent),
+            border = BorderStroke(4.dp, colors.reminderAccent),
             shadowElevation = 24.dp,
         ) {
             Column(
@@ -99,13 +98,13 @@ fun ReminderOverlay(
                     Icon(
                         imageVector = Icons.Rounded.NotificationsActive,
                         contentDescription = null,
-                        tint = AgendaColors.ReminderAccent,
+                        tint = colors.reminderAccent,
                         modifier = Modifier.size(40.dp),
                     )
                     Spacer(modifier = Modifier.width(14.dp))
                     Text(
                         text = "HERINNERING VOOR VANDAAG",
-                        color = AgendaColors.ReminderAccent,
+                        color = colors.reminderAccent,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 1.4.sp,
@@ -117,12 +116,12 @@ fun ReminderOverlay(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
-                        .background(AgendaColors.ReminderAccent.copy(alpha = 0.2f))
+                        .background(colors.reminderAccent.copy(alpha = 0.16f))
                         .padding(horizontal = 22.dp, vertical = 8.dp),
                 ) {
                     Text(
                         text = countdownLabel,
-                        color = AgendaColors.AccentAmber,
+                        color = colors.accentAmber,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                     )
@@ -132,7 +131,7 @@ fun ReminderOverlay(
 
                 Text(
                     text = timeRange,
-                    color = AgendaColors.AccentAmber,
+                    color = colors.accentAmber,
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.sp,
@@ -143,7 +142,7 @@ fun ReminderOverlay(
 
                 Text(
                     text = appointment.title,
-                    color = AgendaColors.TextPrimary,
+                    color = colors.textPrimary,
                     fontSize = 48.sp,
                     fontWeight = FontWeight.ExtraBold,
                     lineHeight = 56.sp,
@@ -154,7 +153,7 @@ fun ReminderOverlay(
 
                 Text(
                     text = "Wordt elke 5 minuten herhaald totdat u op Begrepen tikt",
-                    color = AgendaColors.TextSecondary,
+                    color = colors.textSecondary,
                     fontSize = 19.sp,
                     textAlign = TextAlign.Center,
                 )
@@ -170,8 +169,8 @@ fun ReminderOverlay(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AgendaColors.AccentBlueButton,
-                            contentColor = AgendaColors.TextPrimary,
+                            containerColor = colors.accentBlueButton,
+                            contentColor = colors.onColoredButton,
                         ),
                         contentPadding = PaddingValues(vertical = 24.dp, horizontal = 20.dp),
                     ) {
@@ -193,8 +192,8 @@ fun ReminderOverlay(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AgendaColors.AccentGreen,
-                            contentColor = AgendaColors.AccentGreenOn,
+                            containerColor = colors.accentGreen,
+                            contentColor = colors.accentGreenOn,
                         ),
                         contentPadding = PaddingValues(vertical = 24.dp, horizontal = 20.dp),
                     ) {

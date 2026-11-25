@@ -38,7 +38,7 @@ import nl.senioragenda.app.domain.formatting.DutchDateTimeFormatter
 import nl.senioragenda.app.speech.SpeechStatus
 import nl.senioragenda.app.speech.SpeechUiState
 import nl.senioragenda.app.ui.CalendarSyncStatus
-import nl.senioragenda.app.ui.theme.AgendaColors
+import nl.senioragenda.app.ui.theme.AgendaTheme
 import java.time.LocalDateTime
 
 @Composable
@@ -52,11 +52,13 @@ fun TopDashboardBar(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AgendaTheme.colors
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = AgendaColors.SurfacePanel,
+        color = colors.surfacePanel,
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.5.dp, AgendaColors.BorderSubtle),
+        border = BorderStroke(1.5.dp, colors.borderSubtle),
     ) {
         Row(
             modifier = Modifier
@@ -65,14 +67,13 @@ fun TopDashboardBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            // Linkerzijde: Nederlandse dag & datum + subtiele statuschip voor familiebeheer
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     text = DutchDateTimeFormatter.formatTopBarDate(now.toLocalDate()),
-                    color = AgendaColors.TextPrimary,
+                    color = colors.textPrimary,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.8.sp,
@@ -87,7 +88,7 @@ fun TopDashboardBar(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(AgendaColors.SurfaceCard)
+                            .background(colors.surfaceCard)
                             .clickable(onClick = onSettingsClick)
                             .padding(horizontal = 12.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -100,16 +101,16 @@ fun TopDashboardBar(
                             },
                             contentDescription = "Agenda-instellingen",
                             tint = if (syncStatus == CalendarSyncStatus.CONNECTED) {
-                                AgendaColors.AccentGreen
+                                colors.accentGreen
                             } else {
-                                AgendaColors.TextMuted
+                                colors.textMuted
                             },
                             modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = syncStatusLabel,
-                            color = AgendaColors.TextSecondary,
+                            color = colors.textSecondary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                         )
@@ -118,7 +119,7 @@ fun TopDashboardBar(
                     if (speechState.status == SpeechStatus.DUTCH_VOICE_MISSING) {
                         Text(
                             text = "Nederlandse spraakstem ontbreekt",
-                            color = AgendaColors.ReminderAccent,
+                            color = colors.reminderAccent,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -128,7 +129,6 @@ fun TopDashboardBar(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Midden-rechts: Grote duidelijke knoppen "Spreek voor" en "Afspraak toevoegen"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -138,11 +138,11 @@ fun TopDashboardBar(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (speechState.isSpeaking) {
-                            AgendaColors.ReminderUrgent
+                            colors.reminderUrgent
                         } else {
-                            AgendaColors.AccentBlueButton
+                            colors.accentBlueButton
                         },
-                        contentColor = AgendaColors.TextPrimary,
+                        contentColor = colors.onColoredButton,
                     ),
                     contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
                 ) {
@@ -167,8 +167,8 @@ fun TopDashboardBar(
                     onClick = onAddAppointmentClick,
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AgendaColors.AccentPurpleGemini,
-                        contentColor = AgendaColors.TextPrimary,
+                        containerColor = colors.accentPurpleGemini,
+                        contentColor = colors.onColoredButton,
                     ),
                     contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
                 ) {
@@ -181,7 +181,7 @@ fun TopDashboardBar(
                     Icon(
                         imageVector = Icons.Rounded.AutoAwesome,
                         contentDescription = null,
-                        tint = AgendaColors.AccentAmber,
+                        tint = androidx.compose.ui.graphics.Color(0xFFFDE047),
                         modifier = Modifier.size(22.dp),
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -195,10 +195,9 @@ fun TopDashboardBar(
 
             Spacer(modifier = Modifier.width(24.dp))
 
-            // Uiterst rechts: Grote 24-uurs klok
             Text(
                 text = DutchDateTimeFormatter.formatTime(now.toLocalTime()),
-                color = AgendaColors.AccentAmber,
+                color = colors.accentAmber,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.sp,

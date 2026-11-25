@@ -23,7 +23,8 @@ import nl.senioragenda.app.ui.components.TodayPanel
 import nl.senioragenda.app.ui.components.TomorrowPanel
 import nl.senioragenda.app.ui.components.TopDashboardBar
 import nl.senioragenda.app.ui.components.UpcomingDaysPanel
-import nl.senioragenda.app.ui.theme.AgendaColors
+import nl.senioragenda.app.ui.theme.AgendaTheme
+import nl.senioragenda.app.ui.theme.DisplayThemeMode
 
 @Composable
 fun AgendaDashboardScreen(
@@ -46,12 +47,15 @@ fun AgendaDashboardScreen(
     onConnectGoogleClick: () -> Unit,
     onTestReminderClick: () -> Unit,
     onToggleNightPreviewClick: () -> Unit,
+    onDisplayThemeModeSelected: (DisplayThemeMode) -> Unit,
     onDismissSettingsSheet: () -> Unit,
 ) {
+    val colors = AgendaTheme.colors
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AgendaColors.Background),
+            .background(colors.background),
     ) {
         // Hoofddashboard in vaste liggende drie-sectie-indeling
         Column(
@@ -123,6 +127,8 @@ fun AgendaDashboardScreen(
             FamilySettingsModal(
                 state = state.settingsSheet,
                 manualNightPreview = state.manualNightPreview,
+                selectedThemeMode = state.displayThemeMode,
+                onThemeModeSelected = onDisplayThemeModeSelected,
                 onCalendarIdChanged = onCalendarIdChanged,
                 onSaveCalendarId = onSaveCalendarId,
                 onSyncDeviceCalendarClick = onSyncDeviceCalendarClick,

@@ -2,6 +2,7 @@ package nl.senioragenda.app.data.local
 
 import android.content.Context
 import nl.senioragenda.app.BuildConfig
+import nl.senioragenda.app.ui.theme.DisplayThemeMode
 
 /**
  * Slaat lokale voorkeuren op (zoals gekoppelde gedeelde agenda-ID en bevestigde herinneringen)
@@ -27,6 +28,12 @@ class AgendaPreferences(context: Context) {
             prefs.edit().putBoolean(KEY_GOOGLE_CONNECTED, value).apply()
         }
 
+    var displayThemeMode: DisplayThemeMode
+        get() = DisplayThemeMode.fromStorageKey(prefs.getString(KEY_DISPLAY_THEME_MODE, null))
+        set(value) {
+            prefs.edit().putString(KEY_DISPLAY_THEME_MODE, value.storageKey).apply()
+        }
+
     fun getAcknowledgedReminderIds(): Set<String> {
         return prefs.getStringSet(KEY_ACK_REMINDER_IDS, emptySet())?.toSet().orEmpty()
     }
@@ -48,6 +55,7 @@ class AgendaPreferences(context: Context) {
         private const val PREFS_NAME = "senior_agenda_prefs"
         private const val KEY_CALENDAR_ID = "google_calendar_id"
         private const val KEY_GOOGLE_CONNECTED = "google_calendar_connected"
+        private const val KEY_DISPLAY_THEME_MODE = "display_theme_mode"
         private const val KEY_ACK_REMINDER_IDS = "ack_reminder_ids"
         private const val DEFAULT_CALENDAR_ID = "primary"
         private const val MAX_STORED_ACK_IDS = 120

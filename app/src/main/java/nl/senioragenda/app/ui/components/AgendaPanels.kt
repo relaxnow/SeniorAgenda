@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import nl.senioragenda.app.domain.formatting.DutchDateTimeFormatter
 import nl.senioragenda.app.domain.model.Appointment
 import nl.senioragenda.app.domain.model.DayAgenda
-import nl.senioragenda.app.ui.theme.AgendaColors
+import nl.senioragenda.app.ui.theme.AgendaTheme
 import java.time.LocalTime
 
 @Composable
@@ -39,11 +40,13 @@ fun TodayPanel(
     currentTime: LocalTime,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AgendaTheme.colors
+
     Surface(
         modifier = modifier.fillMaxHeight(),
-        color = AgendaColors.SurfacePanel,
+        color = colors.surfacePanel,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.5.dp, AgendaColors.BorderSubtle),
+        border = BorderStroke(1.5.dp, colors.borderSubtle),
     ) {
         Column(
             modifier = Modifier
@@ -52,7 +55,7 @@ fun TodayPanel(
         ) {
             SectionHeader(
                 title = "VANDAAG",
-                accentColor = AgendaColors.AccentAmber,
+                accentColor = colors.accentAmber,
             )
 
             Spacer(modifier = Modifier.height(18.dp))
@@ -65,14 +68,14 @@ fun TodayPanel(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "Geen afspraken vandaag",
-                            color = AgendaColors.TextPrimary,
+                            color = colors.textPrimary,
                             fontSize = 36.sp,
                             fontWeight = FontWeight.Bold,
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = "Een rustige dag",
-                            color = AgendaColors.TextSecondary,
+                            color = colors.textSecondary,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.Medium,
                         )
@@ -112,11 +115,13 @@ fun TodayPanel(
 
 @Composable
 private fun TodayAllDayCard(appointment: Appointment) {
+    val colors = AgendaTheme.colors
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AgendaColors.AccentSkyContainer,
+        color = colors.accentSkyContainer,
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(2.dp, AgendaColors.AccentSky),
+        border = BorderStroke(2.dp, colors.accentSky),
     ) {
         Row(
             modifier = Modifier
@@ -127,12 +132,12 @@ private fun TodayAllDayCard(appointment: Appointment) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(AgendaColors.AccentSky)
+                    .background(colors.accentSky)
                     .padding(horizontal = 14.dp, vertical = 6.dp),
             ) {
                 Text(
                     text = "HELE DAG",
-                    color = AgendaColors.Background,
+                    color = colors.accentSkyOnBadge,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.8.sp,
@@ -141,7 +146,7 @@ private fun TodayAllDayCard(appointment: Appointment) {
             Spacer(modifier = Modifier.width(18.dp))
             Text(
                 text = appointment.title,
-                color = AgendaColors.TextPrimary,
+                color = colors.textPrimary,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,
@@ -157,22 +162,11 @@ private fun TodayTimedCard(
     isHighlighted: Boolean,
     isPast: Boolean,
 ) {
-    val backgroundColor = when {
-        isHighlighted -> AgendaColors.SurfaceCardHighlight
-        else -> AgendaColors.SurfaceCard
-    }
-    val borderColor = when {
-        isHighlighted -> AgendaColors.BorderHighlight
-        else -> AgendaColors.BorderSubtle
-    }
-    val timeColor = when {
-        isPast -> AgendaColors.TextMuted
-        else -> AgendaColors.AccentAmber
-    }
-    val titleColor = when {
-        isPast -> AgendaColors.TextMuted
-        else -> AgendaColors.TextPrimary
-    }
+    val colors = AgendaTheme.colors
+    val backgroundColor = if (isHighlighted) colors.surfaceCardHighlight else colors.surfaceCard
+    val borderColor = if (isHighlighted) colors.borderHighlight else colors.borderSubtle
+    val timeColor = if (isPast) colors.textMuted else colors.accentAmber
+    val titleColor = if (isPast) colors.textMuted else colors.textPrimary
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -209,11 +203,13 @@ fun TomorrowPanel(
     tomorrowAgenda: DayAgenda,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AgendaTheme.colors
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = AgendaColors.SurfacePanel,
+        color = colors.surfacePanel,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.5.dp, AgendaColors.BorderSubtle),
+        border = BorderStroke(1.5.dp, colors.borderSubtle),
     ) {
         Column(
             modifier = Modifier
@@ -222,7 +218,7 @@ fun TomorrowPanel(
         ) {
             SectionHeader(
                 title = DutchDateTimeFormatter.formatTomorrowHeader(tomorrowAgenda.date),
-                accentColor = AgendaColors.AccentSky,
+                accentColor = colors.accentSky,
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -234,7 +230,7 @@ fun TomorrowPanel(
                 ) {
                     Text(
                         text = "Geen afspraken morgen",
-                        color = AgendaColors.TextSecondary,
+                        color = colors.textSecondary,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Medium,
                     )
@@ -257,13 +253,15 @@ fun TomorrowPanel(
 
 @Composable
 private fun TomorrowAppointmentRow(appointment: Appointment) {
+    val colors = AgendaTheme.colors
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = if (appointment.isAllDay) AgendaColors.AccentSkyContainer else AgendaColors.SurfaceCard,
+        color = if (appointment.isAllDay) colors.accentSkyContainer else colors.surfaceCard,
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
             width = 1.dp,
-            color = if (appointment.isAllDay) AgendaColors.AccentSky else AgendaColors.BorderSubtle,
+            color = if (appointment.isAllDay) colors.accentSky else colors.borderSubtle,
         ),
     ) {
         Row(
@@ -274,7 +272,7 @@ private fun TomorrowAppointmentRow(appointment: Appointment) {
         ) {
             Text(
                 text = DutchDateTimeFormatter.formatAppointmentTimeLabel(appointment),
-                color = if (appointment.isAllDay) AgendaColors.AccentSky else AgendaColors.AccentAmber,
+                color = if (appointment.isAllDay) colors.accentSky else colors.accentAmber,
                 fontSize = 21.sp,
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.width(152.dp),
@@ -282,7 +280,7 @@ private fun TomorrowAppointmentRow(appointment: Appointment) {
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = appointment.title,
-                color = AgendaColors.TextPrimary,
+                color = colors.textPrimary,
                 fontSize = 23.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,
@@ -297,11 +295,13 @@ fun UpcomingDaysPanel(
     upcomingDays: List<DayAgenda>,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AgendaTheme.colors
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = AgendaColors.SurfacePanel,
+        color = colors.surfacePanel,
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.5.dp, AgendaColors.BorderSubtle),
+        border = BorderStroke(1.5.dp, colors.borderSubtle),
     ) {
         Column(
             modifier = Modifier
@@ -310,7 +310,7 @@ fun UpcomingDaysPanel(
         ) {
             SectionHeader(
                 title = "DAARNA",
-                accentColor = AgendaColors.TextSecondary,
+                accentColor = colors.textSecondary,
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -325,7 +325,7 @@ fun UpcomingDaysPanel(
                     UpcomingDayRow(dayAgenda = dayAgenda)
                     if (index < upcomingDays.lastIndex) {
                         HorizontalDivider(
-                            color = AgendaColors.BorderSubtle.copy(alpha = 0.65f),
+                            color = colors.borderSubtle.copy(alpha = 0.65f),
                             thickness = 1.dp,
                         )
                     }
@@ -337,6 +337,8 @@ fun UpcomingDaysPanel(
 
 @Composable
 private fun UpcomingDayRow(dayAgenda: DayAgenda) {
+    val colors = AgendaTheme.colors
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -345,7 +347,7 @@ private fun UpcomingDayRow(dayAgenda: DayAgenda) {
     ) {
         Text(
             text = DutchDateTimeFormatter.formatCompactDay(dayAgenda.date),
-            color = AgendaColors.TextPrimary,
+            color = colors.textPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.width(118.dp),
@@ -356,7 +358,7 @@ private fun UpcomingDayRow(dayAgenda: DayAgenda) {
         if (dayAgenda.isEmpty) {
             Text(
                 text = "Geen afspraken",
-                color = AgendaColors.TextMuted,
+                color = colors.textMuted,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Normal,
             )
@@ -376,11 +378,7 @@ private fun UpcomingDayRow(dayAgenda: DayAgenda) {
                             } else {
                                 DutchDateTimeFormatter.formatAppointmentTimeLabel(appointment)
                             },
-                            color = if (appointment.isAllDay) {
-                                AgendaColors.AccentSky
-                            } else {
-                                AgendaColors.AccentAmber
-                            },
+                            color = if (appointment.isAllDay) colors.accentSky else colors.accentAmber,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.width(136.dp),
@@ -388,7 +386,7 @@ private fun UpcomingDayRow(dayAgenda: DayAgenda) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = appointment.title,
-                            color = AgendaColors.TextPrimary,
+                            color = colors.textPrimary,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -404,8 +402,10 @@ private fun UpcomingDayRow(dayAgenda: DayAgenda) {
 @Composable
 private fun SectionHeader(
     title: String,
-    accentColor: androidx.compose.ui.graphics.Color,
+    accentColor: Color,
 ) {
+    val colors = AgendaTheme.colors
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
@@ -417,7 +417,7 @@ private fun SectionHeader(
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = title,
-            color = AgendaColors.TextPrimary,
+            color = colors.textPrimary,
             fontSize = 23.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 1.sp,
