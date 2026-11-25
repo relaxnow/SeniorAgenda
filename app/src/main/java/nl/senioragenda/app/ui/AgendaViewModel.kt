@@ -7,6 +7,7 @@ import android.database.ContentObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +34,7 @@ import nl.senioragenda.app.speech.SpeechUiState
 import nl.senioragenda.app.speech.VoiceInputState
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 
 enum class CalendarSyncStatus {
     DEMO_MODE,
@@ -90,6 +92,7 @@ class AgendaViewModel(
     private var lastManualTestSpokenAt: LocalDateTime? = null
     private var lastDisplayedDate: LocalDate = LocalDate.now()
     private var calendarContentObserver: ContentObserver? = null
+    private var debouncedObserverRefreshJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         AgendaUiState(
@@ -168,7 +171,7 @@ class AgendaViewModel(
                     googleAccessToken != null -> refreshGoogleCalendarWithToken(googleAccessToken!!)
                     container.agendaRepository.hasDeviceCalendarPermission() -> {
                         container.androidGoogleCalendarSyncClient.requestImmediateGoogleSync()
-                        refreshDeviceSyncedGoogleCalendar()
+                        refreshDeviceSyncedGoogleCalendar(silentBackground = true)
                     }
                     container.preferences.isGoogleCalendarConnected -> {
                         connectOrRefreshGoogleCalendar(silentIfConsentNeeded = true)
@@ -203,12 +206,27 @@ class AgendaViewModel(
             temporaryWakeUntil = null
         }
 
+        // Voorkom onnodige 1Hz Compose-hertekening (die op de Tab S9 FE 30Hz<->90Hz schermtrilling
+        // kan veroorzaken): werk `now` alleen bij op de minuut, behalve tijdens de 30s nachtstand-aftelling.
+        val displayNow = if (nightState is NightModeState.TemporaryWake) {
+            now.truncatedTo(ChronoUnit.SECONDS)
+        } else {
+            now.truncatedTo(ChronoUnit.MINUTES)
+        }
+
         _uiState.update { state ->
-            state.copy(
-                now = now,
-                activeReminder = currentReminder,
-                nightModeState = nightState,
-            )
+            if (state.now == displayNow &&
+                state.activeReminder == currentReminder &&
+                state.nightModeState == nightState
+            ) {
+                state
+            } else {
+                state.copy(
+                    now = displayNow,
+                    activeReminder = currentReminder,
+                    nightModeState = nightState,
+                )
+            }
         }
     }
 
@@ -259,7 +277,13 @@ class AgendaViewModel(
     ) {
         allAppointments = appointments.sortedWith(Appointment.CHRONOLOGICAL_COMPARATOR)
         val snapshot = AgendaRepository.buildSnapshot(now.toLocalDate(), allAppointments)
-        _uiState.update { it.copy(snapshot = snapshot, now = now) }
+        _uiState.update { state ->
+            if (state.snapshot == snapshot) {
+                state
+            } else {
+                state.copy(snapshot = snapshot)
+            }
+        }
         scheduleNextSystemAlarm(now)
     }
 
@@ -274,7 +298,11 @@ class AgendaViewModel(
     private fun ensureCalendarObserverRegistered() {
         if (calendarContentObserver == null) {
             calendarContentObserver = container.androidGoogleCalendarSyncClient.registerCalendarObserver {
-                refreshDeviceSyncedGoogleCalendar()
+                debouncedObserverRefreshJob?.cancel()
+                debouncedObserverRefreshJob = viewModelScope.launch {
+                    delay(OBSERVER_DEBOUNCE_MS)
+                    refreshDeviceSyncedGoogleCalendar(silentBackground = true)
+                }
             }
         }
     }
@@ -284,7 +312,7 @@ class AgendaViewModel(
     fun onCalendarPermissionsResult(granted: Boolean) {
         if (granted) {
             ensureCalendarObserverRegistered()
-            refreshDeviceSyncedGoogleCalendar()
+            refreshDeviceSyncedGoogleCalendar(triggerCloudSync = true)
         } else {
             _uiState.update {
                 it.copy(
@@ -296,16 +324,21 @@ class AgendaViewModel(
         }
     }
 
-    fun refreshDeviceSyncedGoogleCalendar(triggerCloudSync: Boolean = false) {
+    fun refreshDeviceSyncedGoogleCalendar(
+        triggerCloudSync: Boolean = false,
+        silentBackground: Boolean = false,
+    ) {
         viewModelScope.launch {
             if (triggerCloudSync) {
                 container.androidGoogleCalendarSyncClient.requestImmediateGoogleSync()
             }
-            _uiState.update {
-                it.copy(
-                    syncStatus = CalendarSyncStatus.SYNCING,
-                    syncStatusLabel = "Google Agenda bijwerken…",
-                )
+            if (!silentBackground && _uiState.value.syncStatus != CalendarSyncStatus.CONNECTED) {
+                _uiState.update {
+                    it.copy(
+                        syncStatus = CalendarSyncStatus.SYNCING,
+                        syncStatusLabel = "Google Agenda bijwerken…",
+                    )
+                }
             }
 
             val now = LocalDateTime.now()
@@ -319,15 +352,23 @@ class AgendaViewModel(
                     val timeStr = DutchDateTimeFormatter.formatTime(now.toLocalTime())
                     val accountLabel = loadResult.accountLabel ?: "Google Agenda"
                     _uiState.update {
-                        it.copy(
-                            syncStatus = CalendarSyncStatus.CONNECTED,
-                            syncStatusLabel = "Google Agenda ($accountLabel) · $timeStr",
-                            lastSyncTimeLabel = timeStr,
-                            usingDeviceGoogleCalendar = true,
-                            settingsSheet = it.settingsSheet.copy(
-                                statusNotice = "Gekoppeld met Google Agenda ($accountLabel). Bijgewerkt om $timeStr.",
-                            ),
-                        )
+                        val label = "Google Agenda ($accountLabel)"
+                        if (it.syncStatus == CalendarSyncStatus.CONNECTED &&
+                            it.syncStatusLabel == label &&
+                            it.usingDeviceGoogleCalendar
+                        ) {
+                            it
+                        } else {
+                            it.copy(
+                                syncStatus = CalendarSyncStatus.CONNECTED,
+                                syncStatusLabel = label,
+                                lastSyncTimeLabel = timeStr,
+                                usingDeviceGoogleCalendar = true,
+                                settingsSheet = it.settingsSheet.copy(
+                                    statusNotice = "Gekoppeld met Google Agenda ($accountLabel). Bijgewerkt om $timeStr.",
+                                ),
+                            )
+                        }
                     }
                 } else {
                     applyAppointments(
@@ -581,7 +622,12 @@ class AgendaViewModel(
                 val now = LocalDateTime.now()
                 when {
                     googleAccessToken != null -> refreshGoogleCalendarWithToken(googleAccessToken!!)
-                    container.agendaRepository.hasDeviceCalendarPermission() -> refreshDeviceSyncedGoogleCalendar()
+                    container.agendaRepository.hasDeviceCalendarPermission() -> {
+                        refreshDeviceSyncedGoogleCalendar(
+                            triggerCloudSync = true,
+                            silentBackground = true,
+                        )
+                    }
                     else -> {
                         val merged = (allAppointments + created).distinctBy { it.id }
                         applyAppointments(merged, now)
@@ -812,6 +858,7 @@ class AgendaViewModel(
     companion object {
         private const val CLOCK_TICK_MS = 1_000L
         private const val CALENDAR_SYNC_INTERVAL_MS = 2 * 60 * 1_000L
+        private const val OBSERVER_DEBOUNCE_MS = 1_500L
 
         fun factory(
             application: Application,

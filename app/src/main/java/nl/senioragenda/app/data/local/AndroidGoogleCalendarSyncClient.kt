@@ -202,6 +202,7 @@ class AndroidGoogleCalendarSyncClient(
 
         val insertedUri = contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
             ?: return@withContext null
+        requestImmediateGoogleSync()
         val newEventId = insertedUri.lastPathSegment ?: System.currentTimeMillis().toString()
         draft.toAppointment(
             id = "device-gcal-$newEventId",
