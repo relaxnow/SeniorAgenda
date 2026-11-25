@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dagoverzicht</string>
+
+    <!-- Top bar & main sections -->
+    <string name="btn_speak_aloud">Spreek voor</string>
+    <string name="btn_stop_speaking">Stop met voorlezen</string>
+    <string name="btn_add_appointment">Afspraak toevoegen</string>
+    <string name="section_today">VANDAAG</string>
+    <string name="section_tomorrow_prefix">MORGEN</string>
+    <string name="section_upcoming">DAARNA</string>
+
+    <!-- Empty states -->
+    <string name="empty_today_title">Geen afspraken vandaag</string>
+    <string name="empty_today_subtitle">Een rustige dag</string>
+    <string name="empty_tomorrow">Geen afspraken morgen</string>
+    <string name="empty_upcoming_day">Geen afspraken</string>
+    <string name="all_day_label">HELE DAG</string>
+
+    <!-- Reminder overlay -->
+    <string name="reminder_header_today">HERINNERING VOOR VANDAAG</string>
+    <string name="reminder_repeat_hint">Wordt elke 5 minuten herhaald totdat u op Begrepen tikt</string>
+    <string name="btn_understood">Begrepen</string>
+    <string name="btn_read_again">Opnieuw voorlezen</string>
+
+    <!-- Night mode -->
+    <string name="night_mode_label">Nachtstand</string>
+    <string name="night_mode_tap_hint">Tik op het scherm om even te kijken</string>
+    <string name="night_mode_temp_wake">Tijdelijk actief — keert zo terug naar nachtstand</string>
+
+    <!-- Status notices -->
+    <string name="status_connected_google">Google Agenda gekoppeld</string>
+    <string name="status_demo_mode">Voorbeeldweergave · Beheer</string>
+    <string name="status_syncing">Agenda bijwerken…</string>
+    <string name="status_dutch_voice_missing">Nederlandse stem ontbreekt in spraakinstellingen</string>
+</resources>

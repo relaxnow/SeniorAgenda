@@ -1,0 +1,8 @@
+# Kopieer deze waarden naar local.properties (dat bestand staat in .gitignore).
+# Laat waarden leeg om de app direct in lokale voorbeeldmodus te testen.
+
+# Optioneel: Google Gemini API-sleutel voor spraak-naar-afspraak in natuurlijk Nederlands
+GEMINI_API_KEY=
+
+# Optioneel: Gedeelde Google Agenda-ID (standaard "primary" voor de hoofdagenda van het gekoppelde account)
+GOOGLE_CALENDAR_ID=primary
