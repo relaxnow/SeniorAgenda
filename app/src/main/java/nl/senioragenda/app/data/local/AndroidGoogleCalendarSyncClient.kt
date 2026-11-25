@@ -1,12 +1,14 @@
 package nl.senioragenda.app.data.local
 
 import android.Manifest
+import android.accounts.Account
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
@@ -113,7 +115,7 @@ class AndroidGoogleCalendarSyncClient(
         contentResolver.query(
             uri,
             projection,
-            null,
+            "${CalendarContract.Events.DELETED} = 0",
             null,
             "${CalendarContract.Instances.BEGIN} ASC",
         )?.use { cursor ->
@@ -205,6 +207,30 @@ class AndroidGoogleCalendarSyncClient(
             id = "device-gcal-$newEventId",
             source = AppointmentSource.GOOGLE_CALENDAR,
         )
+    }
+
+    /**
+     * Vraagt Android's Google Agenda SyncAdapter expliciet om direct te synchroniseren
+     * zodat wijzigingen of verwijderingen op een telefoon sneller op de tablet verschijnen.
+     */
+    fun requestImmediateGoogleSync() {
+        if (!hasReadPermission()) return
+        runCatching {
+            val accountNames = querySyncedGoogleCalendars()
+                .map { it.accountName }
+                .distinct()
+            val extras = Bundle().apply {
+                putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true)
+                putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true)
+            }
+            accountNames.forEach { accountName ->
+                ContentResolver.requestSync(
+                    Account(accountName, GOOGLE_ACCOUNT_TYPE),
+                    CalendarContract.AUTHORITY,
+                    extras,
+                )
+            }
+        }
     }
 
     fun registerCalendarObserver(onChanged: () -> Unit): ContentObserver? {

@@ -14,6 +14,7 @@ import java.time.Month
  *
  * Voorbeelden die worden herkend:
  * - "Morgen van 14:00 tot 15:00 huisarts"
+ * - "Van 2 's middags tot 3 's middags huisarts" -> 14:00 - 15:00, Huisarts
  * - "Vrijdag om half drie tandarts" -> standaard 1 uur (14:30 - 15:30)
  * - "Zaterdag hele dag hapjes komen aan"
  * - "Overmorgen om 10 uur 15 tot 11 uur fysiotherapie"
@@ -72,28 +73,35 @@ object LocalDutchAppointmentParser {
         "twaalf" to 12,
     )
 
+    private const val PERIOD_OPT =
+        """(?:\s*(?:['’]?s\s*(?:morgens|ochtends|middags|avonds|nachts)|in\s+de\s+(?:ochtend|middag|avond)))?"""
+
     private val RANGE_REGEX = Regex(
-        pattern = """(?i)\b(?:van\s+)?(\d{1,2})(?:[:.](\d{2})|\s*uur(?:\s*(\d{1,2}))?)\s*(?:tot|-|–)\s*(\d{1,2})(?:[:.](\d{2})|\s*uur(?:\s*(\d{1,2}))?)\b""",
+        pattern = """(?i)\b(?:van\s+)?(\d{1,2})(?:[:.](\d{2})|\s*uur(?:\s*(\d{1,2}))?)?$PERIOD_OPT\s*(?:tot|-|–)\s*(\d{1,2})(?:[:.](\d{2})|\s*uur(?:\s*(\d{1,2}))?)?$PERIOD_OPT\b""",
     )
 
     private val SINGLE_COLON_TIME_REGEX = Regex(
-        pattern = """(?i)\b(?:om\s+)?(\d{1,2})[:.](\d{2})(?:\s*uur)?\b""",
+        pattern = """(?i)\b(?:om\s+)?(\d{1,2})[:.](\d{2})(?:\s*uur)?$PERIOD_OPT\b""",
     )
 
     private val SINGLE_UUR_REGEX = Regex(
-        pattern = """(?i)\b(?:om\s+)?(\d{1,2})\s*uur(?:\s*(\d{1,2}))?\b""",
+        pattern = """(?i)\b(?:om\s+)?(\d{1,2})\s*uur(?:\s*(\d{1,2}))?$PERIOD_OPT\b""",
+    )
+
+    private val SINGLE_PERIOD_HOUR_REGEX = Regex(
+        pattern = """(?i)\b(?:om\s+|van\s+)?(\d{1,2})\s*(?:['’]?s\s*(morgens|ochtends|middags|avonds|nachts))\b""",
     )
 
     private val HALF_TIME_REGEX = Regex(
-        pattern = """(?i)\b(?:om\s+)?half\s+(\d{1,2}|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|elf|twaalf)\b""",
+        pattern = """(?i)\b(?:om\s+)?half\s+(\d{1,2}|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|elf|twaalf)$PERIOD_OPT\b""",
     )
 
     private val KWART_OVER_REGEX = Regex(
-        pattern = """(?i)\b(?:om\s+)?kwart\s+over\s+(\d{1,2}|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|elf|twaalf)\b""",
+        pattern = """(?i)\b(?:om\s+)?kwart\s+over\s+(\d{1,2}|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|elf|twaalf)$PERIOD_OPT\b""",
     )
 
     private val KWART_VOOR_REGEX = Regex(
-        pattern = """(?i)\b(?:om\s+)?kwart\s+voor\s+(\d{1,2}|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|elf|twaalf)\b""",
+        pattern = """(?i)\b(?:om\s+)?kwart\s+voor\s+(\d{1,2}|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|elf|twaalf)$PERIOD_OPT\b""",
     )
 
     private val EXPLICIT_DATE_REGEX = Regex(
@@ -108,12 +116,13 @@ object LocalDutchAppointmentParser {
         input: String,
         referenceNow: LocalDateTime,
     ): ParsedAppointmentDraft? {
-        val raw = input.trim()
+        val raw = input.trim().replace('’', '\'')
         if (raw.isBlank()) return null
 
         var working = raw
         val lower = raw.lowercase()
         val isMorningHint = lower.contains("ochtend") || lower.contains("'s morgens") || lower.contains("s morgens")
+        val isAfternoonHint = lower.contains("middag") || lower.contains("'s middags") || lower.contains("s middags")
         val isEveningHint = lower.contains("avond") || lower.contains("'s avonds") || lower.contains("s avonds")
 
         // 1. Datum bepalen
@@ -185,11 +194,16 @@ object LocalDutchAppointmentParser {
 
         val rangeMatch = RANGE_REGEX.find(working)
         if (rangeMatch != null) {
-            val h1 = rangeMatch.groupValues[1].toIntOrNull()
+            val h1Raw = rangeMatch.groupValues[1].toIntOrNull()
             val m1 = rangeMatch.groupValues[2].ifBlank { rangeMatch.groupValues[3] }.toIntOrNull() ?: 0
-            val h2 = rangeMatch.groupValues[4].toIntOrNull()
+            val h2Raw = rangeMatch.groupValues[4].toIntOrNull()
             val m2 = rangeMatch.groupValues[5].ifBlank { rangeMatch.groupValues[6] }.toIntOrNull() ?: 0
-            if (h1 != null && h2 != null && h1 in 0..23 && h2 in 0..23 && m1 in 0..59 && m2 in 0..59) {
+            if (h1Raw != null && h2Raw != null && h1Raw in 0..23 && h2Raw in 0..23 && m1 in 0..59 && m2 in 0..59) {
+                val h1 = adjustDutch12Hour(h1Raw, isMorningHint, isAfternoonHint, isEveningHint)
+                var h2 = adjustDutch12Hour(h2Raw, isMorningHint, isAfternoonHint, isEveningHint)
+                if (h2 < h1 && h2 + 12 <= 23) {
+                    h2 += 12
+                }
                 startTime = LocalTime.of(h1, m1)
                 endTime = LocalTime.of(h2, m2)
                 working = working.replaceRange(rangeMatch.range, " ")
@@ -199,9 +213,10 @@ object LocalDutchAppointmentParser {
         if (startTime == null) {
             val colonMatch = SINGLE_COLON_TIME_REGEX.find(working)
             if (colonMatch != null) {
-                val h = colonMatch.groupValues[1].toIntOrNull()
+                val hRaw = colonMatch.groupValues[1].toIntOrNull()
                 val m = colonMatch.groupValues[2].toIntOrNull()
-                if (h != null && m != null && h in 0..23 && m in 0..59) {
+                if (hRaw != null && m != null && hRaw in 0..23 && m in 0..59) {
+                    val h = adjustDutch12Hour(hRaw, isMorningHint, isAfternoonHint, isEveningHint)
                     startTime = LocalTime.of(h, m)
                     working = working.replaceRange(colonMatch.range, " ")
                 }
@@ -213,7 +228,7 @@ object LocalDutchAppointmentParser {
             if (halfMatch != null) {
                 val spokenHour = parseSpokenHour(halfMatch.groupValues[1])
                 if (spokenHour != null) {
-                    val baseHour = adjustDutch12Hour(spokenHour, isMorningHint, isEveningHint)
+                    val baseHour = adjustDutch12Hour(spokenHour, isMorningHint, isAfternoonHint, isEveningHint)
                     val actualHour = (baseHour - 1 + 24) % 24
                     startTime = LocalTime.of(actualHour, 30)
                     working = working.replaceRange(halfMatch.range, " ")
@@ -226,7 +241,7 @@ object LocalDutchAppointmentParser {
             if (kwartOverMatch != null) {
                 val spokenHour = parseSpokenHour(kwartOverMatch.groupValues[1])
                 if (spokenHour != null) {
-                    val actualHour = adjustDutch12Hour(spokenHour, isMorningHint, isEveningHint)
+                    val actualHour = adjustDutch12Hour(spokenHour, isMorningHint, isAfternoonHint, isEveningHint)
                     startTime = LocalTime.of(actualHour, 15)
                     working = working.replaceRange(kwartOverMatch.range, " ")
                 }
@@ -238,7 +253,7 @@ object LocalDutchAppointmentParser {
             if (kwartVoorMatch != null) {
                 val spokenHour = parseSpokenHour(kwartVoorMatch.groupValues[1])
                 if (spokenHour != null) {
-                    val baseHour = adjustDutch12Hour(spokenHour, isMorningHint, isEveningHint)
+                    val baseHour = adjustDutch12Hour(spokenHour, isMorningHint, isAfternoonHint, isEveningHint)
                     val actualHour = (baseHour - 1 + 24) % 24
                     startTime = LocalTime.of(actualHour, 45)
                     working = working.replaceRange(kwartVoorMatch.range, " ")
@@ -249,12 +264,30 @@ object LocalDutchAppointmentParser {
         if (startTime == null) {
             val uurMatch = SINGLE_UUR_REGEX.find(working)
             if (uurMatch != null) {
-                val h = uurMatch.groupValues[1].toIntOrNull()
+                val hRaw = uurMatch.groupValues[1].toIntOrNull()
                 val m = uurMatch.groupValues[2].toIntOrNull() ?: 0
-                if (h != null && h in 0..23 && m in 0..59) {
-                    val adjustedH = if (h in 1..7 && !isMorningHint) h + 12 else h
+                if (hRaw != null && hRaw in 0..23 && m in 0..59) {
+                    val adjustedH = adjustDutch12Hour(hRaw, isMorningHint, isAfternoonHint, isEveningHint)
                     startTime = LocalTime.of(adjustedH, m)
                     working = working.replaceRange(uurMatch.range, " ")
+                }
+            }
+        }
+
+        if (startTime == null) {
+            val periodMatch = SINGLE_PERIOD_HOUR_REGEX.find(working)
+            if (periodMatch != null) {
+                val hRaw = periodMatch.groupValues[1].toIntOrNull()
+                val period = periodMatch.groupValues[2].lowercase()
+                if (hRaw != null && hRaw in 0..23) {
+                    val adjustedH = adjustDutch12Hour(
+                        hour = hRaw,
+                        isMorningHint = period.startsWith("morg") || period.startsWith("ocht"),
+                        isAfternoonHint = period.startsWith("midd"),
+                        isEveningHint = period.startsWith("avon"),
+                    )
+                    startTime = LocalTime.of(adjustedH, 0)
+                    working = working.replaceRange(periodMatch.range, " ")
                 }
             }
         }
@@ -293,11 +326,12 @@ object LocalDutchAppointmentParser {
     private fun adjustDutch12Hour(
         hour: Int,
         isMorningHint: Boolean,
+        isAfternoonHint: Boolean,
         isEveningHint: Boolean,
     ): Int {
         return when {
             hour >= 13 -> hour
-            isEveningHint && hour in 1..11 -> hour + 12
+            (isEveningHint || isAfternoonHint) && hour in 1..11 -> hour + 12
             !isMorningHint && hour in 1..7 -> hour + 12
             else -> hour
         }
@@ -313,7 +347,12 @@ object LocalDutchAppointmentParser {
 
     private fun cleanTitle(raw: String): String {
         val cleaned = raw
-            .replace(Regex("""(?i)\b(afspraak|toevoegen|zet\s+in\s+de\s+agenda|in\s+de\s+agenda|op\s+de\s+agenda|naar\s+de|naar\s+het|bij\s+de|in\s+de\s+ochtend|in\s+de\s+middag|in\s+de\s+avond|'s\s+morgens|'s\s+middags|'s\s+avonds)\b"""), " ")
+            .replace(
+                Regex("""(?i)\b(afspraak|toevoegen|zet\s+in\s+de\s+agenda|in\s+de\s+agenda|op\s+de\s+agenda|naar\s+de|naar\s+het|bij\s+de|in\s+de\s+ochtend|in\s+de\s+middag|in\s+de\s+avond)\b"""),
+                " ",
+            )
+            .replace(Regex("""(?i)['’]?s\s+(?:morgens|ochtends|middags|avonds|nachts)\b"""), " ")
+            .replace(Regex("""(?i)^\s*(?:van|tot|om)\b"""), " ")
             .replace(Regex("""^[\s,.:;\-]+|[\s,.:;\-]+$"""), "")
             .replace(Regex("""\s{2,}"""), " ")
             .trim()

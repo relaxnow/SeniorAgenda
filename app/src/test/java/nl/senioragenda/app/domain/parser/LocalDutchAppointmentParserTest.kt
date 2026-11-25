@@ -58,6 +58,19 @@ class LocalDutchAppointmentParserTest {
     }
 
     @Test
+    fun parsesSpokenDutchAfternoonRangeWithoutUur() {
+        val draft = LocalDutchAppointmentParser.parse(
+            input = "Van 2 's middags tot 3 's middags huisarts",
+            referenceNow = referenceNow,
+        )
+        assertNotNull(draft)
+        assertFalse(draft!!.isAllDay)
+        assertEquals(LocalTime.of(14, 0), draft.startTime)
+        assertEquals(LocalTime.of(15, 0), draft.endTime)
+        assertEquals("Huisarts", draft.title)
+    }
+
+    @Test
     fun geminiJsonParserAppliesOneHourDefaultWhenEndTimeMissing() {
         val parser = GeminiAppointmentParser(apiKey = "")
         val draft = parser.parseStructuredJson(

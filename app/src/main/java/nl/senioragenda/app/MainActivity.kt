@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
                             ),
                         )
                     } else {
-                        viewModel.refreshDeviceSyncedGoogleCalendar()
+                        viewModel.refreshDeviceSyncedGoogleCalendar(triggerCloudSync = true)
                     }
                 }
 
@@ -165,7 +165,7 @@ class MainActivity : ComponentActivity() {
                             Manifest.permission.WRITE_CALENDAR,
                         ) == PackageManager.PERMISSION_GRANTED
                         if (hasRead && hasWrite) {
-                            viewModel.refreshDeviceSyncedGoogleCalendar()
+                            viewModel.refreshDeviceSyncedGoogleCalendar(triggerCloudSync = true)
                         } else {
                             calendarPermissionLauncher.launch(
                                 arrayOf(

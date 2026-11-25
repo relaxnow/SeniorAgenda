@@ -166,7 +166,10 @@ class AgendaViewModel(
                 delay(CALENDAR_SYNC_INTERVAL_MS)
                 when {
                     googleAccessToken != null -> refreshGoogleCalendarWithToken(googleAccessToken!!)
-                    container.agendaRepository.hasDeviceCalendarPermission() -> refreshDeviceSyncedGoogleCalendar()
+                    container.agendaRepository.hasDeviceCalendarPermission() -> {
+                        container.androidGoogleCalendarSyncClient.requestImmediateGoogleSync()
+                        refreshDeviceSyncedGoogleCalendar()
+                    }
                     container.preferences.isGoogleCalendarConnected -> {
                         connectOrRefreshGoogleCalendar(silentIfConsentNeeded = true)
                     }
@@ -293,8 +296,11 @@ class AgendaViewModel(
         }
     }
 
-    fun refreshDeviceSyncedGoogleCalendar() {
+    fun refreshDeviceSyncedGoogleCalendar(triggerCloudSync: Boolean = false) {
         viewModelScope.launch {
+            if (triggerCloudSync) {
+                container.androidGoogleCalendarSyncClient.requestImmediateGoogleSync()
+            }
             _uiState.update {
                 it.copy(
                     syncStatus = CalendarSyncStatus.SYNCING,
@@ -805,7 +811,7 @@ class AgendaViewModel(
 
     companion object {
         private const val CLOCK_TICK_MS = 1_000L
-        private const val CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1_000L
+        private const val CALENDAR_SYNC_INTERVAL_MS = 2 * 60 * 1_000L
 
         fun factory(
             application: Application,
