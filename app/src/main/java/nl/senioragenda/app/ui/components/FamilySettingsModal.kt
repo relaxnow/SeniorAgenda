@@ -41,6 +41,7 @@ fun FamilySettingsModal(
     manualNightPreview: Boolean,
     onCalendarIdChanged: (String) -> Unit,
     onSaveCalendarId: () -> Unit,
+    onSyncDeviceCalendarClick: () -> Unit,
     onConnectGoogleClick: () -> Unit,
     onTestReminderClick: () -> Unit,
     onToggleNightPreviewClick: () -> Unit,
@@ -149,6 +150,23 @@ fun FamilySettingsModal(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Button(
+                        onClick = onSyncDeviceCalendarClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AgendaColors.AccentGreen,
+                            contentColor = AgendaColors.AccentGreenOn,
+                        ),
+                        contentPadding = PaddingValues(vertical = 16.dp),
+                    ) {
+                        Text(
+                            text = "Gebruik tablet Google Agenda",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                        )
+                    }
+
+                    Button(
                         onClick = onConnectGoogleClick,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
@@ -159,7 +177,7 @@ fun FamilySettingsModal(
                         contentPadding = PaddingValues(vertical = 16.dp),
                     ) {
                         Text(
-                            text = "Koppel / Vernieuw Google Agenda",
+                            text = "Koppel via Google Cloud OAuth",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                         )

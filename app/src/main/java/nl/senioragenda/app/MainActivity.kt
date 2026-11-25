@@ -1,9 +1,11 @@
 package nl.senioragenda.app
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,6 +50,35 @@ class MainActivity : ComponentActivity() {
                     applyWindowBrightness(state.nightModeState.targetScreenBrightness)
                 }
 
+                // Agendatoestemming voor live gesynchroniseerde Google Agenda op deze tablet
+                val calendarPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions(),
+                ) { results ->
+                    val readGranted = results[Manifest.permission.READ_CALENDAR] == true
+                    viewModel.onCalendarPermissionsResult(readGranted)
+                }
+
+                LaunchedEffect(Unit) {
+                    val hasRead = ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.READ_CALENDAR,
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val hasWrite = ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.WRITE_CALENDAR,
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (!hasRead || !hasWrite) {
+                        calendarPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.READ_CALENDAR,
+                                Manifest.permission.WRITE_CALENDAR,
+                            ),
+                        )
+                    } else {
+                        viewModel.refreshDeviceSyncedGoogleCalendar()
+                    }
+                }
+
                 // Microfoontoestemming aanvragen voor Nederlandse spraakinvoer
                 val micPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
@@ -56,6 +87,30 @@ class MainActivity : ComponentActivity() {
                         viewModel.startDutchVoiceCapture()
                     } else {
                         viewModel.onMicPermissionDenied()
+                    }
+                }
+
+                // Terugval op Google-spraakdialoog (RecognizerIntent) als inline SpeechRecognizer hapert
+                val systemVoiceLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult(),
+                ) { activityResult ->
+                    val matches = activityResult.data
+                        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                    val best = matches?.firstOrNull()
+                    viewModel.onSystemVoiceSheetResult(
+                        recognizedText = best,
+                        wasCancelled = activityResult.resultCode != Activity.RESULT_OK,
+                    )
+                }
+
+                LaunchedEffect(state.voiceInputState.shouldLaunchSystemVoiceSheet) {
+                    if (!state.voiceInputState.shouldLaunchSystemVoiceSheet) return@LaunchedEffect
+                    viewModel.onSystemVoiceSheetLaunched()
+                    val intent = viewModel.createSystemVoiceIntent()
+                    runCatching {
+                        systemVoiceLauncher.launch(intent)
+                    }.onFailure {
+                        viewModel.onSystemVoiceSheetUnavailable()
                     }
                 }
 
@@ -100,6 +155,26 @@ class MainActivity : ComponentActivity() {
                     onDismissAddSheet = viewModel::closeAddAppointmentSheet,
                     onCalendarIdChanged = viewModel::onCalendarIdChanged,
                     onSaveCalendarId = viewModel::saveCalendarIdAndRefresh,
+                    onSyncDeviceCalendarClick = {
+                        val hasRead = ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.READ_CALENDAR,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        val hasWrite = ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.WRITE_CALENDAR,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (hasRead && hasWrite) {
+                            viewModel.refreshDeviceSyncedGoogleCalendar()
+                        } else {
+                            calendarPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.READ_CALENDAR,
+                                    Manifest.permission.WRITE_CALENDAR,
+                                ),
+                            )
+                        }
+                    },
                     onConnectGoogleClick = {
                         viewModel.connectOrRefreshGoogleCalendar(silentIfConsentNeeded = false)
                     },

@@ -1,6 +1,8 @@
 package nl.senioragenda.app.data
 
 import nl.senioragenda.app.data.local.AgendaPreferences
+import nl.senioragenda.app.data.local.AndroidGoogleCalendarSyncClient
+import nl.senioragenda.app.data.local.DeviceCalendarLoadResult
 import nl.senioragenda.app.data.remote.GoogleCalendarApiClient
 import nl.senioragenda.app.domain.model.AgendaSnapshot
 import nl.senioragenda.app.domain.model.Appointment
@@ -12,15 +14,21 @@ import java.time.ZoneId
 import java.util.UUID
 
 /**
- * Centrale opslag- en synchronisatielaag tussen Google Agenda en de lokale voorbeeldmodus.
- * Levert altijd een overzichtelijk [AgendaSnapshot] voor VANDAAG, MORGEN en DAARNA (4 dagen).
+ * Centrale opslag- en synchronisatielaag tussen:
+ * 1. De op de tablet gesynchroniseerde Google Agenda (`CalendarContract`, standaard & direct live),
+ * 2. Rechtstreekse Google Calendar REST API v3 (OAuth), en
+ * 3. Lokale voorbeeldweergave (alleen wanneer er nog geen agendatoestemming is verleend).
  */
 class AgendaRepository(
     private val preferences: AgendaPreferences,
+    private val androidGoogleCalendarSyncClient: AndroidGoogleCalendarSyncClient,
     private val googleCalendarApiClient: GoogleCalendarApiClient,
 ) {
     private val localFallbackAppointments = mutableListOf<Appointment>()
     private var lastSeedDate: LocalDate? = null
+
+    fun hasDeviceCalendarPermission(): Boolean =
+        androidGoogleCalendarSyncClient.hasReadPermission()
 
     fun loadLocalFallbackAppointments(today: LocalDate): List<Appointment> {
         if (lastSeedDate != today && localFallbackAppointments.none { it.source == AppointmentSource.LOCAL }) {
@@ -32,6 +40,17 @@ class AgendaRepository(
             lastSeedDate = today
         }
         return localFallbackAppointments.sortedWith(Appointment.CHRONOLOGICAL_COMPARATOR)
+    }
+
+    suspend fun fetchSyncedDeviceGoogleCalendar(
+        today: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): DeviceCalendarLoadResult {
+        return androidGoogleCalendarSyncClient.fetchSyncedGoogleAppointments(
+            fromDate = today,
+            toDateInclusive = today.plusDays(UPCOMING_DAYS_COUNT.toLong() + 1L),
+            zoneId = zoneId,
+        )
     }
 
     suspend fun fetchGoogleCalendarAppointments(
@@ -54,21 +73,31 @@ class AgendaRepository(
         accessToken: String?,
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): Appointment {
-        return if (!accessToken.isNullOrBlank()) {
-            googleCalendarApiClient.createEvent(
+        if (!accessToken.isNullOrBlank()) {
+            return googleCalendarApiClient.createEvent(
                 accessToken = accessToken,
                 calendarId = preferences.calendarId,
                 draft = draft,
                 zoneId = zoneId,
             )
-        } else {
-            val localAppointment = draft.toAppointment(
-                id = "local-${UUID.randomUUID()}",
-                source = AppointmentSource.LOCAL,
-            )
-            localFallbackAppointments.add(localAppointment)
-            localAppointment
         }
+
+        if (androidGoogleCalendarSyncClient.hasWritePermission()) {
+            val inserted = androidGoogleCalendarSyncClient.insertAppointmentIntoGoogleCalendar(
+                draft = draft,
+                zoneId = zoneId,
+            )
+            if (inserted != null) {
+                return inserted
+            }
+        }
+
+        val localAppointment = draft.toAppointment(
+            id = "local-${UUID.randomUUID()}",
+            source = AppointmentSource.LOCAL,
+        )
+        localFallbackAppointments.add(localAppointment)
+        return localAppointment
     }
 
     companion object {

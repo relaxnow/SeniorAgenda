@@ -1,7 +1,9 @@
 package nl.senioragenda.app.ui
 
+import android.app.Application
 import android.content.Intent
 import android.content.IntentSender
+import android.database.ContentObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -31,7 +33,6 @@ import nl.senioragenda.app.speech.SpeechUiState
 import nl.senioragenda.app.speech.VoiceInputState
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 
 enum class CalendarSyncStatus {
     DEMO_MODE,
@@ -70,6 +71,7 @@ data class AgendaUiState(
     val settingsSheet: FamilySettingsState = FamilySettingsState(),
     val pendingConsentIntentSender: IntentSender? = null,
     val isGeminiConfigured: Boolean = false,
+    val usingDeviceGoogleCalendar: Boolean = false,
 )
 
 class AgendaViewModel(
@@ -87,6 +89,7 @@ class AgendaViewModel(
     private var manualTestReminder: ActiveReminder? = null
     private var lastManualTestSpokenAt: LocalDateTime? = null
     private var lastDisplayedDate: LocalDate = LocalDate.now()
+    private var calendarContentObserver: ContentObserver? = null
 
     private val _uiState = MutableStateFlow(
         AgendaUiState(
@@ -99,18 +102,23 @@ class AgendaViewModel(
     init {
         val now = LocalDateTime.now()
         lastDisplayedDate = now.toLocalDate()
-        applyAppointments(
-            appointments = container.agendaRepository.loadLocalFallbackAppointments(now.toLocalDate()),
-            now = now,
-        )
 
         observeSpeech()
         observeVoiceInput()
         startClockAndReminderLoop()
         startPeriodicCalendarSync()
 
-        if (container.preferences.isGoogleCalendarConnected) {
-            connectOrRefreshGoogleCalendar(silentIfConsentNeeded = true)
+        if (container.agendaRepository.hasDeviceCalendarPermission()) {
+            ensureCalendarObserverRegistered()
+            refreshDeviceSyncedGoogleCalendar()
+        } else {
+            applyAppointments(
+                appointments = container.agendaRepository.loadLocalFallbackAppointments(now.toLocalDate()),
+                now = now,
+            )
+            if (container.preferences.isGoogleCalendarConnected) {
+                connectOrRefreshGoogleCalendar(silentIfConsentNeeded = true)
+            }
         }
     }
 
@@ -156,21 +164,24 @@ class AgendaViewModel(
         viewModelScope.launch {
             while (isActive) {
                 delay(CALENDAR_SYNC_INTERVAL_MS)
-                if (container.preferences.isGoogleCalendarConnected) {
-                    connectOrRefreshGoogleCalendar(silentIfConsentNeeded = true)
+                when {
+                    googleAccessToken != null -> refreshGoogleCalendarWithToken(googleAccessToken!!)
+                    container.agendaRepository.hasDeviceCalendarPermission() -> refreshDeviceSyncedGoogleCalendar()
+                    container.preferences.isGoogleCalendarConnected -> {
+                        connectOrRefreshGoogleCalendar(silentIfConsentNeeded = true)
+                    }
                 }
             }
         }
     }
 
     private fun tick(now: LocalDateTime) {
-        // Dagovergang om middernacht verwerken
         if (now.toLocalDate() != lastDisplayedDate) {
             lastDisplayedDate = now.toLocalDate()
-            if (googleAccessToken != null) {
-                refreshGoogleCalendarWithToken(googleAccessToken!!)
-            } else {
-                applyAppointments(
+            when {
+                googleAccessToken != null -> refreshGoogleCalendarWithToken(googleAccessToken!!)
+                container.agendaRepository.hasDeviceCalendarPermission() -> refreshDeviceSyncedGoogleCalendar()
+                else -> applyAppointments(
                     appointments = container.agendaRepository.loadLocalFallbackAppointments(now.toLocalDate()),
                     now = now,
                 )
@@ -257,6 +268,91 @@ class AgendaViewModel(
         )
     }
 
+    private fun ensureCalendarObserverRegistered() {
+        if (calendarContentObserver == null) {
+            calendarContentObserver = container.androidGoogleCalendarSyncClient.registerCalendarObserver {
+                refreshDeviceSyncedGoogleCalendar()
+            }
+        }
+    }
+
+    // --- Live Google Agenda op deze Android-tablet (`CalendarContract`) ---
+
+    fun onCalendarPermissionsResult(granted: Boolean) {
+        if (granted) {
+            ensureCalendarObserverRegistered()
+            refreshDeviceSyncedGoogleCalendar()
+        } else {
+            _uiState.update {
+                it.copy(
+                    settingsSheet = it.settingsSheet.copy(
+                        statusNotice = "Agendatoestemming is nodig om uw echte Google Agenda te tonen.",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun refreshDeviceSyncedGoogleCalendar() {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    syncStatus = CalendarSyncStatus.SYNCING,
+                    syncStatusLabel = "Google Agenda bijwerken…",
+                )
+            }
+
+            val now = LocalDateTime.now()
+            val result = runCatching {
+                container.agendaRepository.fetchSyncedDeviceGoogleCalendar(today = now.toLocalDate())
+            }
+
+            result.onSuccess { loadResult ->
+                if (loadResult.hasSyncedGoogleCalendars) {
+                    applyAppointments(loadResult.appointments, now)
+                    val timeStr = DutchDateTimeFormatter.formatTime(now.toLocalTime())
+                    val accountLabel = loadResult.accountLabel ?: "Google Agenda"
+                    _uiState.update {
+                        it.copy(
+                            syncStatus = CalendarSyncStatus.CONNECTED,
+                            syncStatusLabel = "Google Agenda ($accountLabel) · $timeStr",
+                            lastSyncTimeLabel = timeStr,
+                            usingDeviceGoogleCalendar = true,
+                            settingsSheet = it.settingsSheet.copy(
+                                statusNotice = "Gekoppeld met Google Agenda ($accountLabel). Bijgewerkt om $timeStr.",
+                            ),
+                        )
+                    }
+                } else {
+                    applyAppointments(
+                        appointments = container.agendaRepository.loadLocalFallbackAppointments(now.toLocalDate()),
+                        now = now,
+                    )
+                    _uiState.update {
+                        it.copy(
+                            syncStatus = CalendarSyncStatus.DEMO_MODE,
+                            syncStatusLabel = "Geen Google Agenda gevonden · Beheer",
+                            usingDeviceGoogleCalendar = false,
+                            settingsSheet = it.settingsSheet.copy(
+                                statusNotice = "Geen gesynchroniseerde Google Agenda gevonden op deze tablet. Controleer de Google Agenda-app.",
+                            ),
+                        )
+                    }
+                }
+            }.onFailure {
+                _uiState.update {
+                    it.copy(
+                        syncStatus = CalendarSyncStatus.ERROR,
+                        syncStatusLabel = "Agenda lezen mislukt · Beheer",
+                        settingsSheet = it.settingsSheet.copy(
+                            statusNotice = "Kon de agenda op deze tablet niet uitlezen. Controleer agendatoestemming.",
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     // --- Gebruikersacties: Voorlezen ("Spreek voor") ---
 
     fun onSpeakAgendaClicked() {
@@ -300,7 +396,6 @@ class AgendaViewModel(
     fun handleAlarmWakeIntent(appointmentId: String?) {
         val now = LocalDateTime.now()
         if (appointmentId != null) {
-            // Forceer direct hercontrole zodat de spraakmelding bij ontwaken direct klinkt
             lastSpokenSlotByAppointmentId.remove(appointmentId)
         }
         tick(now)
@@ -384,6 +479,32 @@ class AgendaViewModel(
         voiceInputManager.stopListening()
     }
 
+    fun createSystemVoiceIntent(): Intent = voiceInputManager.createSystemVoiceIntent()
+
+    fun onSystemVoiceSheetLaunched() {
+        voiceInputManager.onSystemVoiceSheetLaunched()
+    }
+
+    fun onSystemVoiceSheetResult(recognizedText: String?, wasCancelled: Boolean) {
+        voiceInputManager.onSystemVoiceSheetResult(recognizedText, wasCancelled)
+        val trimmed = recognizedText?.trim().orEmpty()
+        if (trimmed.isNotBlank()) {
+            _uiState.update {
+                it.copy(
+                    addSheet = it.addSheet.copy(
+                        inputText = trimmed,
+                        feedbackMessage = null,
+                    ),
+                )
+            }
+            parseCurrentAppointmentInput()
+        }
+    }
+
+    fun onSystemVoiceSheetUnavailable() {
+        voiceInputManager.onSystemVoiceSheetUnavailable()
+    }
+
     fun parseCurrentAppointmentInput() {
         val rawText = _uiState.value.addSheet.inputText.trim()
         if (rawText.isBlank()) {
@@ -452,11 +573,13 @@ class AgendaViewModel(
 
             result.onSuccess { created ->
                 val now = LocalDateTime.now()
-                if (googleAccessToken != null) {
-                    refreshGoogleCalendarWithToken(googleAccessToken!!)
-                } else {
-                    val merged = (allAppointments + created).distinctBy { it.id }
-                    applyAppointments(merged, now)
+                when {
+                    googleAccessToken != null -> refreshGoogleCalendarWithToken(googleAccessToken!!)
+                    container.agendaRepository.hasDeviceCalendarPermission() -> refreshDeviceSyncedGoogleCalendar()
+                    else -> {
+                        val merged = (allAppointments + created).distinctBy { it.id }
+                        applyAppointments(merged, now)
+                    }
                 }
                 closeAddAppointmentSheet()
                 val dateLabel = DutchDateTimeFormatter.formatSpokenDate(created.date)
@@ -473,7 +596,7 @@ class AgendaViewModel(
                     it.copy(
                         addSheet = it.addSheet.copy(
                             isSaving = false,
-                            feedbackMessage = "Opslaan in de agenda is niet gelukt. Controleer de internetverbinding en probeer opnieuw.",
+                            feedbackMessage = "Opslaan in de agenda is niet gelukt. Controleer de agendatoestemming en probeer opnieuw.",
                         ),
                     )
                 }
@@ -544,7 +667,7 @@ class AgendaViewModel(
                         _uiState.update {
                             it.copy(
                                 syncStatus = CalendarSyncStatus.DEMO_MODE,
-                                syncStatusLabel = "Voorbeeldweergave · Koppel Google Agenda",
+                                syncStatusLabel = "Voorbeeldweergave · Beheer",
                             )
                         }
                     } else {
@@ -558,7 +681,7 @@ class AgendaViewModel(
                     _uiState.update {
                         it.copy(
                             syncStatus = CalendarSyncStatus.ERROR,
-                            syncStatusLabel = "Voorbeeldweergave · Beheer",
+                            syncStatusLabel = if (it.usingDeviceGoogleCalendar) it.syncStatusLabel else "Voorbeeldweergave · Beheer",
                             settingsSheet = it.settingsSheet.copy(statusNotice = outcome.dutchMessage),
                         )
                     }
@@ -583,7 +706,7 @@ class AgendaViewModel(
                 _uiState.update {
                     it.copy(
                         syncStatus = CalendarSyncStatus.ERROR,
-                        syncStatusLabel = "Voorbeeldweergave · Beheer",
+                        syncStatusLabel = if (it.usingDeviceGoogleCalendar) it.syncStatusLabel else "Voorbeeldweergave · Beheer",
                         settingsSheet = it.settingsSheet.copy(statusNotice = outcome.dutchMessage),
                     )
                 }
@@ -673,6 +796,8 @@ class AgendaViewModel(
     }
 
     override fun onCleared() {
+        container.androidGoogleCalendarSyncClient.unregisterCalendarObserver(calendarContentObserver)
+        calendarContentObserver = null
         voiceInputManager.stopListening()
         speechManager.shutdown()
         super.onCleared()
@@ -683,7 +808,7 @@ class AgendaViewModel(
         private const val CALENDAR_SYNC_INTERVAL_MS = 5 * 60 * 1_000L
 
         fun factory(
-            application: android.app.Application,
+            application: Application,
             container: AppContainer,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
